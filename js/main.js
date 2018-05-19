@@ -32,6 +32,9 @@ var mouse = new THREE.Vector2();
 var treemeshs = [];
 var baseColor = 0x2d4c1e;
 var intersectColor = 0x00D66B;
+var lastSelected;
+var currentSelected;
+var currentIntersected;
 var lastIntersected;
 var lastModelScene;
 
@@ -53,7 +56,7 @@ function setupThreeJS() {
     camera.rotation.y = 35 * Math.PI / 180;
     camera.rotation.z = 37 * Math.PI / 180;
     renderer.domElement.addEventListener('mousemove', onDocumentMouseMove, false);
-
+    renderer.domElement.addEventListener('click', onDocumentMouseClick, false);
     clock = new THREE.Clock(false);
 }
 
@@ -618,46 +621,59 @@ function onDocumentMouseMove(event) {
     raycaster.setFromCamera(mouse, camera);
     var intersections = raycaster.intersectObjects(treemeshs);
     var intersected;
+    if (intersections.length > 0) {
+        intersected = intersections[0].object;
+        if (intersected && intersected != lastIntersected) {
+            currentIntersected = intersected;
+            if (lastIntersected != currentSelected) {
+                lastIntersected.material[1].color.setHex(baseColor);
+            }
+            currentIntersected.material[1].color.setHex(intersectColor);
+            lastIntersected = currentIntersected;
+        }
+        document.body.style.cursor = 'pointer';
+    } else {
+        document.body.style.cursor = 'auto';
+        if (lastIntersected != currentSelected) {
+            lastIntersected.material[1].color.setHex(baseColor);
+        }
+    }
+}
+
+function onDocumentMouseClick() {
+    event.preventDefault();
+    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+    raycaster.setFromCamera(mouse, camera);
+    var intersections = raycaster.intersectObjects(treemeshs);
+    var intersected;
     // console.log(intersections);
     if (intersections.length > 0) {
         intersected = intersections[0].object;
         if (intersected) {
-            intersected.material[1].color.setHex(intersectColor);
-            if (lastIntersected && lastIntersected != intersected) {
-                lastIntersected.material[1].color.setHex(baseColor);
+            if (lastSelected) {
+                lastSelected.material[1].color.setHex(baseColor);
+                lastSelected = intersected;
+                currentSelected = intersected;
+                currentSelected.material[1].color.setHex(intersectColor);
+            } else {
+                if (currentSelected == null) {
+                    currentSelected = intersected;
+                    currentSelected.material[1].color.setHex(intersectColor);
+                    lastSelected = currentSelected;
+                } else if (intersected != currentSelected) {
+                    lastSelected.material[1].color.setHex(baseColor);
+                    lastSelected = intersected;
+                    currentSelected = intersected;
+                    currentSelected.material[1].color.setHex(intersectColor);
+                } else {
+                    lastSelected = null;
+                    currentSelected = null;
+                }
             }
-            lastIntersected = intersected;
         }
-        document.body.style.cursor = 'pointer';
-    } else if (intersected) {
-        intersected.material[1].color.setHex(baseColor);
-        intersected = null;
-        lastIntersected = null;
-        document.body.style.cursor = 'auto';
-    } else {
-        if (lastIntersected) {
-            lastIntersected.material[1].color.setHex(baseColor);
-            lastIntersected = null;
-        }
-        document.body.style.cursor = 'auto';
-
     }
-    // if (intersections.length > 0) {
-    //     // 如果不是最上面的object
-    //     if (intersected != intersections[0].object) {
-    //         // 如果object 不为空 就设置为原来的颜色
-    //         if (intersected)
-    //             intersected.material[1].color.setHex(baseColor);
-    //         intersected = intersections[0].object;
-    //         intersected.material[1].color.setHex(intersectColor);
-    //         // console.log(intersected.position);
-    //     }
-    //     document.body.style.cursor = 'pointer';
-    // } else if (intersected) {
-    //     intersected.material[1].color.setHex(baseColor);
-    //     intersected = null;
-    //     document.body.style.cursor = 'auto';
-    // }
 }
 
 function stopAnimating() {
