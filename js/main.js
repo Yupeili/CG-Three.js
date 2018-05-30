@@ -37,6 +37,8 @@ var currentSelected;
 var currentIntersected;
 var lastIntersected;
 var lastModelScene;
+var helper;
+var sphereMesh;
 
 function setupThreeJS() {
     scene = new THREE.Scene();
@@ -58,6 +60,13 @@ function setupThreeJS() {
     renderer.domElement.addEventListener('mousemove', onDocumentMouseMove, false);
     renderer.domElement.addEventListener('click', onDocumentMouseClick, false);
     clock = new THREE.Clock(false);
+
+    var sphereGeo = new THREE.SphereGeometry(20);
+    var sphereMat = new THREE.MeshBasicMaterial();
+    sphereMat.color = new THREE.Color(1, 0, 0);
+    sphereMesh = new THREE.Mesh(sphereGeo, sphereMat);
+    scene.add(sphereMesh);
+
 }
 
 function setupWorld() {
@@ -275,6 +284,7 @@ function setupDatGui() {
                 randomness = THREE.Terrain.ScatterHelper(THREE.Terrain[that.scattering], o, 2, 0.125);
             }
             var geo = terrainScene.children[0].geometry;
+            geo.computeFaceNormals();
             terrainScene.remove(decoScene);
             decoScene = scatterMeshes(geo, {
                 mesh: mesh,
@@ -405,6 +415,9 @@ function scatterMeshes(geometry, options) {
         v = geometry.vertices,
         // meshes = [],
         up = options.mesh.up.clone().applyAxisAngle(new THREE.Vector3(1, 0, 0), 0.5 * Math.PI);
+    // for (var k = 0; k < geometry.vertices.length; k++) {
+    //     geometry.vertices[k].vertexColors = new THREE.Color(255, 255, 255);
+    // }
     if (spreadIsNumber) {
         randomHeightmap = options.randomness();
         randomness = typeof randomHeightmap === 'number' ? Math.random : function (k) {
@@ -440,6 +453,7 @@ function scatterMeshes(geometry, options) {
                 var mesh = options.mesh.clone();
                 // mesh = new THREE.Mesh(g, options.material);
                 // mesh.geometry.computeBoundingBox();
+                // TODO
                 mesh.position.copy(v[f.a]).add(v[f.b]).add(v[f.c]).divideScalar(3);
                 // mesh.translateZ((mesh.geometry.boundingBox.max.z - mesh.geometry.boundingBox.min.z) * 0.5);
                 if (options.maxTilt > 0) {
@@ -490,11 +504,11 @@ function scatterMeshes(geometry, options) {
 
     }
     // There's no BufferGeometry merge method implemented yet.
-    else {
-        // for (k = 0, l = treemeshs.length; k < l; k++) {
-        //     options.scene.add(treemeshs[k]);
-        // }
-    }
+    // else {
+    // for (k = 0, l = treemeshs.length; k < l; k++) {
+    //     options.scene.add(treemeshs[k]);
+    // }
+    // }
 
     return options.scene;
 };
@@ -527,6 +541,11 @@ function setupControls() {
     // controls.movementSpeed = 100;
     // controls.lookSpeed = 0.075;
 
+    // var geometry = new THREE.ConeBufferGeometry(20, 100, 3);
+    // geometry.translate(0, 50, 0);
+    // geometry.rotateX(Math.PI / 2);
+    // helper = new THREE.Mesh(geometry, new THREE.MeshNormalMaterial());
+    // scene.add(helper);
 }
 
 // Stop animating if the window is out of focus
@@ -638,42 +657,100 @@ function onDocumentMouseMove(event) {
             lastIntersected.material[1].color.setHex(baseColor);
         }
     }
+
+
+    // mouse.x = ( event.clientX / renderer.domElement.clientWidth ) * 2 - 1;
+    // mouse.y = - ( event.clientY / renderer.domElement.clientHeight ) * 2 + 1;
+    // raycaster.setFromCamera( mouse, camera );
+    //
+    // // See if the ray from the camera into the world hits one of our meshes
+    // var intersects = raycaster.intersectObject(terrainScene.children[0]);
+    // // console.log(intersects.length);
+    // // Toggle rotation bool for meshes that we clicked
+    // if ( intersects.length > 0 ) {
+    //     // 小三角的位置
+    //     console.log(intersects[0]);
+    //     helper.position.set( 0, 0, 0 );
+    //     helper.lookAt( intersects[ 0 ].face.normal );
+    //
+    //     helper.position.copy( intersects[ 0 ].point );
+    //
+    // }
 }
 
 function onDocumentMouseClick() {
     event.preventDefault();
     mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
     mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+// TODO: Raycasting to terrain, but get weird result
+    if (currentSelected) {
+        // terrainScene.children[0].geometry.computeCentroids();
+        terrainScene.children[0].geometry.computeFaceNormals();
+        console.log(terrainScene.children[0]);
 
-    raycaster.setFromCamera(mouse, camera);
-    var intersections = raycaster.intersectObjects(treemeshs);
-    var intersected;
-    // console.log(intersections);
-    if (intersections.length > 0) {
-        intersected = intersections[0].object;
-        if (intersected) {
-            if (lastSelected) {
+        // raycasting to terrain's mesh
+        // for (var i = 0; i < terrainScene.children[0].faces.length; i++) {
+        //     intersections = raycaster.intersectObject(terrainScene.children[0].faces[i]);
+        //     if(intersections){
+        //         break;
+        //     }
+        // }
+
+        // if select a tree, and click another tree
+        intersections = raycaster.intersectObjects(treemeshs);
+        // terrainScene.children[0].raycast(raycaster, interactions);
+        if (intersections.length > 0) {
+            lastSelected = currentSelected;
+            lastSelected.material[1].color.setHex(baseColor);
+            currentSelected = intersections[0].object;
+        } else {
+            // if select a tree and click an empty space, change position
+            intersections = raycaster.intersectObject(terrainScene.children[0]);
+            if (intersections.length > 0) {
+                currentSelected.position.set(0, 0, 0);
+                // currentSelected.lookAt(intersections[0].face.normal);
+                console.log("The log below is from the intersect point");
+                console.log(intersections[0].point);
+                currentSelected.position.copy(intersections[0].point);
+                sphereMesh.position.copy(intersections[0].point);
                 lastSelected.material[1].color.setHex(baseColor);
-                lastSelected = intersected;
-                currentSelected = intersected;
-                currentSelected.material[1].color.setHex(intersectColor);
-            } else {
-                if (currentSelected == null) {
-                    currentSelected = intersected;
-                    currentSelected.material[1].color.setHex(intersectColor);
-                    lastSelected = currentSelected;
-                } else if (intersected != currentSelected) {
+                currentSelected = null;
+            }
+        }
+    } else {
+        // if no tree is selected
+        raycaster.setFromCamera(mouse, camera);
+        var intersections = raycaster.intersectObjects(treemeshs);
+        var intersected;
+        // console.log(intersections);
+        if (intersections.length > 0) {
+            intersected = intersections[0].object;
+            if (intersected) {
+                if (lastSelected) {
                     lastSelected.material[1].color.setHex(baseColor);
                     lastSelected = intersected;
                     currentSelected = intersected;
                     currentSelected.material[1].color.setHex(intersectColor);
                 } else {
-                    lastSelected = null;
-                    currentSelected = null;
+                    if (currentSelected == null) {
+                        currentSelected = intersected;
+                        currentSelected.material[1].color.setHex(intersectColor);
+                        lastSelected = currentSelected;
+                    } else if (intersected != currentSelected) {
+                        lastSelected.material[1].color.setHex(baseColor);
+                        lastSelected = intersected;
+                        currentSelected = intersected;
+                        currentSelected.material[1].color.setHex(intersectColor);
+                    } else {
+                        lastSelected = null;
+                        currentSelected = null;
+                    }
                 }
             }
         }
     }
+
+
 }
 
 function stopAnimating() {
@@ -682,9 +759,57 @@ function stopAnimating() {
     clock.stop();
 }
 
+function setupModel() {
+    var manager = new THREE.LoadingManager();
+    manager.onProgress = function (item, loaded, total) {
+
+        console.log(item, loaded, total);
+
+    };
+
+    // var textureLoader = new THREE.TextureLoader( manager );
+    // var texture = textureLoader.load( 'textures/UV_Grid_Sm.png' );
+
+    // var material = new THREE.MeshPhongMaterial();
+    // material.map = THREE.ImageUtils.loadTexture('textures/UV_Grid_Sm.png');
+    var textureLoader = new THREE.TextureLoader(manager);
+    var texture = textureLoader.load('textures/house.png');
+    var onProgress = function (xhr) {
+        if (xhr.lengthComputable) {
+            var percentComplete = xhr.loaded / xhr.total * 100;
+            console.log(Math.round(percentComplete, 2) + '% downloaded');
+        }
+    };
+
+    var onError = function (xhr) {
+    };
+
+    var loader = new THREE.OBJLoader(manager);
+    // loader.load('obj/male02/male02.obj', function (object) {
+    loader.load('obj/house.obj', function (object) {
+
+        object.traverse(function (child) {
+
+            if (child instanceof THREE.Mesh) {
+
+                child.material.map = texture;
+
+            }
+
+        });
+        // console.log(object);
+        // object.material.map = texture;
+        object.position.set(0, 0, 0);
+        object.scale.set(50, 50, 50);
+        // object.position.y = 95;
+        scene.add(object);
+
+    }, onProgress, onError);
+}
 
 function setup() {
     setupThreeJS();
+    // setupModel();
     setupWorld();
     setupControls();
     setupDatGui();
